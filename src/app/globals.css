@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --jd-green: #367c2b;
+  --jd-green-dark: #1f4d1a;
+  --jd-green-deep: #0f2e0c;
+  --jd-yellow: #ffde00;
+  --jd-cream: #f7f4e8;
+  --jd-soil: #3d2914;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+html,
+body {
+  /* iOS Safari: avoid rubber-band weirdness on fixed bottom nav */
+  overscroll-behavior-y: none;
+}
+
+body {
+  color: var(--jd-soil);
+  background:
+    radial-gradient(ellipse 120% 80% at 10% -10%, #5aab3c 0%, transparent 45%),
+    radial-gradient(ellipse 90% 60% at 100% 0%, #ffde0066 0%, transparent 40%),
+    linear-gradient(180deg, #e8f0d8 0%, var(--jd-cream) 35%, #eef3e4 100%);
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Field texture — subtle grass hatch, not a flat fill */
+.field-texture {
+  background-image:
+    linear-gradient(180deg, rgba(54, 124, 43, 0.06), transparent 40%),
+    repeating-linear-gradient(
+      -12deg,
+      transparent,
+      transparent 10px,
+      rgba(54, 124, 43, 0.03) 10px,
+      rgba(54, 124, 43, 0.03) 11px
+    );
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex min-h-tap items-center justify-center gap-2 rounded-xl
+      bg-jd-yellow px-5 py-3 text-base font-bold text-jd-green-deep
+      shadow-tap transition active:translate-y-[3px] active:shadow-tap-active
+      disabled:opacity-50 disabled:active:translate-y-0;
+  }
+
+  .btn-secondary {
+    @apply inline-flex min-h-tap items-center justify-center gap-2 rounded-xl
+      border-2 border-jd-green bg-white/80 px-4 py-3 text-base font-semibold
+      text-jd-green-dark transition active:bg-jd-green/10;
+  }
+
+  .btn-danger {
+    @apply inline-flex min-h-tap items-center justify-center gap-2 rounded-xl
+      bg-jd-danger px-4 py-3 text-base font-bold text-white;
+  }
+
+  .btn-done {
+    /* Miles asked for a HUGE Done button */
+    @apply inline-flex min-h-[56px] flex-1 items-center justify-center rounded-2xl
+      bg-jd-green px-4 py-4 text-lg font-extrabold uppercase tracking-wide
+      text-jd-yellow shadow-tap transition active:translate-y-[3px]
+      active:shadow-tap-active disabled:opacity-50;
+  }
+
+  .panel {
+    @apply rounded-2xl border border-jd-green/15 bg-white/75 p-4 backdrop-blur-sm;
+  }
+
+  .input {
+    @apply min-h-tap w-full rounded-xl border-2 border-jd-green/25 bg-white
+      px-4 py-3 text-base text-jd-soil outline-none
+      focus:border-jd-green focus:ring-2 focus:ring-jd-yellow/60;
+  }
+
+  .label {
+    @apply mb-1 block text-sm font-semibold text-jd-green-dark;
+  }
+}
+
+/* Entrance motions — purposeful, not noisy */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes stripe-slide {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 40px 0;
+  }
+}
+
+@keyframes pulse-due {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(192, 57, 43, 0);
+  }
+}
+
+.animate-rise {
+  animation: rise-in 0.45s ease-out both;
+}
+
+.animate-rise-delay-1 {
+  animation: rise-in 0.45s ease-out 0.08s both;
+}
+
+.animate-rise-delay-2 {
+  animation: rise-in 0.45s ease-out 0.16s both;
+}
+
+.jd-stripe {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--jd-green) 0 20px,
+    var(--jd-yellow) 20px 40px
+  );
+  background-size: 40px 100%;
+  animation: stripe-slide 1.2s linear infinite;
+}
+
+.due-pulse {
+  animation: pulse-due 2s ease-in-out infinite;
+}
+
+/* Bottom nav clearance for iOS home indicator */
+.pb-nav {
+  padding-bottom: calc(5.5rem + var(--safe-bottom));
+}
+
+@supports (padding: max(0px)) {
+  .safe-top {
+    padding-top: max(0.75rem, var(--safe-top));
+  }
+}
