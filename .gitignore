@@ -33,6 +33,10 @@ yarn-error.log*
 /data/*.db
 /data/*.db-*
 !/data/.gitkeep
+/streamlit/data/*.db
+/streamlit/data/*.db-*
+/streamlit/.venv/
+/streamlit/.streamlit/secrets.toml
 
 # typescript
 *.tsbuildinfo
@@ -43,3 +47,6 @@ next-env.d.ts
 
 mobile-test-screenshots/
 /opt/
+
+streamlit/.venv/
+mobile-test-screenshots/

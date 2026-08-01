@@ -1,8 +1,17 @@
 # Miles Mowing Management
 
-John Deere–spirited, mobile-first lawn business app for **Miles** in Southwest Topeka, KS.
+John Deere–spirited lawn business app for **Miles** in Southwest Topeka, KS.
+
+Two implementations live in this repo:
+
+| App | Path | Best for |
+|-----|------|----------|
+| **Streamlit (recommended to share)** | [`streamlit/`](./streamlit/) | Free deploy on Streamlit Community Cloud → open in iOS Safari |
+| **Next.js** | repo root | Richer mobile UI if you host a Node server |
 
 Track yards (recurring or adhoc), mark jobs done with one big button, forecast the next mow from season + rain, see a 10-day weather breakdown by Night / Morning / Afternoon, and watch the truck fund grow.
+
+**Send Miles the Streamlit URL + PIN** after deploying — see [`streamlit/README.md`](./streamlit/README.md).
 
 ## Features
 
