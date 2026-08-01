@@ -19,7 +19,7 @@ from lib.calendar_sync import (
     sync_schedule_to_icloud,
 )
 from lib.capacity import fmt_hour, get_capacity_settings, save_capacity_settings
-from lib.db import get_conn
+from lib.db import get_conn, storage_label, using_turso
 from lib.services import (
     ensure_calendar_token,
     get_settings,
@@ -38,6 +38,17 @@ brand_header("Settings, free time, history.")
 
 settings = get_settings()
 cap = get_capacity_settings()
+
+st.subheader("Data storage")
+st.caption(storage_label())
+if using_turso():
+    st.success("Connected to Turso — lawns and money survive redeploys.")
+else:
+    st.warning(
+        "Using temporary local storage. Add free Turso secrets "
+        "(`turso_database_url` + `turso_auth_token`) so a reboot doesn’t wipe data. "
+        "See the Streamlit README for setup steps."
+    )
 
 st.subheader("Profile & savings")
 with st.form("settings"):

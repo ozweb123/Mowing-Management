@@ -1,39 +1,224 @@
 """
 SQLite persistence for Miles Mowing (Streamlit).
-Mirrors the Next.js schema so seed/demo behavior stays familiar.
+
+Uses Turso (remote libSQL) when secrets are set so data survives
+Streamlit Community Cloud redeploys. Falls back to a local SQLite file
+for development.
 """
 
 from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import bcrypt
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 DB_PATH = DATA_DIR / "miles-mowing.db"
 
+_conn_lock = threading.Lock()
 
-def _connect() -> sqlite3.Connection:
+
+class Row(dict):
+    """Dict-like row that also allows integer indexing (sqlite3.Row-ish)."""
+
+    def __getitem__(self, key: Any) -> Any:
+        if isinstance(key, int):
+            return list(dict.values(self))[key]
+        return dict.__getitem__(self, key)
+
+    def keys(self):  # type: ignore[override]
+        return dict.keys(self)
+
+
+def _as_row(description: Any, values: Any) -> Row | None:
+    if values is None:
+        return None
+    if description is None:
+        return Row({str(i): v for i, v in enumerate(values)})
+    cols = [d[0] for d in description]
+    return Row(zip(cols, values))
+
+
+class _Cursor:
+    def __init__(self, cur: Any):
+        self._cur = cur
+        self.description = getattr(cur, "description", None)
+
+    def fetchone(self) -> Row | None:
+        return _as_row(self._cur.description, self._cur.fetchone())
+
+    def fetchall(self) -> list[Row]:
+        desc = self._cur.description
+        return [_as_row(desc, r) for r in self._cur.fetchall()]  # type: ignore[misc]
+
+    def fetchmany(self, size: int | None = None) -> list[Row]:
+        desc = self._cur.description
+        rows = (
+            self._cur.fetchmany(size)
+            if size is not None
+            else self._cur.fetchmany()
+        )
+        return [_as_row(desc, r) for r in rows]  # type: ignore[misc]
+
+    def __iter__(self):
+        desc = self._cur.description
+        for r in self._cur:
+            yield _as_row(desc, r)
+
+    @property
+    def lastrowid(self) -> Any:
+        return getattr(self._cur, "lastrowid", None)
+
+    @property
+    def rowcount(self) -> Any:
+        return getattr(self._cur, "rowcount", -1)
+
+
+class _Conn:
+    """Thin wrapper so Turso/libsql and sqlite3 share one call style."""
+
+    def __init__(self, conn: Any, backend: str):
+        self._conn = conn
+        self.backend = backend  # "turso" | "local"
+
+    def execute(self, sql: str, params: Any = ()) -> _Cursor:
+        if params is None:
+            params = ()
+        return _Cursor(self._conn.execute(sql, params))
+
+    def executemany(self, sql: str, seq: Any) -> _Cursor:
+        return _Cursor(self._conn.executemany(sql, seq))
+
+    def executescript(self, sql: str) -> Any:
+        return self._conn.executescript(sql)
+
+    def commit(self) -> None:
+        self._conn.commit()
+
+    def rollback(self) -> None:
+        self._conn.rollback()
+
+    def close(self) -> None:
+        self._conn.close()
+
+
+def _turso_secrets() -> tuple[str | None, str | None]:
+    url = token = None
+    try:
+        import streamlit as st
+
+        url = st.secrets.get("turso_database_url") or st.secrets.get(
+            "TURSO_DATABASE_URL"
+        )
+        token = st.secrets.get("turso_auth_token") or st.secrets.get(
+            "TURSO_AUTH_TOKEN"
+        )
+    except Exception:
+        pass
+    import os
+
+    url = url or os.environ.get("TURSO_DATABASE_URL")
+    token = token or os.environ.get("TURSO_AUTH_TOKEN")
+    return (
+        str(url).strip() if url else None,
+        str(token).strip() if token else None,
+    )
+
+
+def using_turso() -> bool:
+    url, token = _turso_secrets()
+    return bool(url and token)
+
+
+def _connect() -> _Conn:
+    url, token = _turso_secrets()
+    if url and token:
+        import libsql
+
+        # Remote Turso/libSQL over HTTP — survives Streamlit redeploys.
+        raw = libsql.connect(database=url, auth_token=token)
+        conn = _Conn(raw, "turso")
+        try:
+            conn.execute("PRAGMA foreign_keys = ON")
+        except Exception:
+            pass
+        return conn
+
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    raw = sqlite3.connect(DB_PATH, check_same_thread=False)
+    raw.row_factory = sqlite3.Row
+    raw.execute("PRAGMA foreign_keys = ON")
+    # Wrap so callers always get Row dicts consistently
+    return _LocalConn(raw)
 
 
-def get_conn() -> sqlite3.Connection:
+class _LocalConn(_Conn):
+    """sqlite3 connection that still returns our Row type via execute()."""
+
+    def __init__(self, conn: sqlite3.Connection):
+        super().__init__(conn, "local")
+
+    def execute(self, sql: str, params: Any = ()) -> _Cursor:
+        if params is None:
+            params = ()
+        cur = self._conn.execute(sql, params)
+        # Convert sqlite3.Row → our Row for a single code path
+        return _SqliteCursor(cur)
+
+    def executemany(self, sql: str, seq: Any) -> _Cursor:
+        return _SqliteCursor(self._conn.executemany(sql, seq))
+
+
+class _SqliteCursor(_Cursor):
+    def fetchone(self) -> Row | None:
+        row = self._cur.fetchone()
+        if row is None:
+            return None
+        return Row({k: row[k] for k in row.keys()})
+
+    def fetchall(self) -> list[Row]:
+        return [Row({k: r[k] for k in r.keys()}) for r in self._cur.fetchall()]
+
+    def fetchmany(self, size: int | None = None) -> list[Row]:
+        rows = (
+            self._cur.fetchmany(size)
+            if size is not None
+            else self._cur.fetchmany()
+        )
+        return [Row({k: r[k] for k in r.keys()}) for r in rows]
+
+    def __iter__(self):
+        for r in self._cur:
+            yield Row({k: r[k] for k in r.keys()})
+
+
+def get_conn() -> _Conn:
     """Module-level connection reused inside a Streamlit process."""
-    if not hasattr(get_conn, "_conn") or get_conn._conn is None:  # type: ignore[attr-defined]
-        get_conn._conn = _connect()  # type: ignore[attr-defined]
-        migrate(get_conn._conn)  # type: ignore[attr-defined]
-    return get_conn._conn  # type: ignore[attr-defined]
+    with _conn_lock:
+        if not hasattr(get_conn, "_conn") or get_conn._conn is None:  # type: ignore[attr-defined]
+            get_conn._conn = _connect()  # type: ignore[attr-defined]
+            migrate(get_conn._conn)  # type: ignore[attr-defined]
+        return get_conn._conn  # type: ignore[attr-defined]
 
 
-def migrate(conn: sqlite3.Connection) -> None:
+def storage_label() -> str:
+    """Human-readable backend for Settings UI."""
+    try:
+        backend = get_conn().backend
+    except Exception:
+        backend = "unknown"
+    if backend == "turso":
+        return "Turso (persistent — survives redeploys)"
+    return "Local SQLite (resets on Streamlit Cloud redeploy)"
+
+
+def migrate(conn: _Conn) -> None:
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS settings (
@@ -154,7 +339,7 @@ def migrate(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def _seed_lawns(conn: sqlite3.Connection) -> None:
+def _seed_lawns(conn: _Conn) -> None:
     now = datetime.utcnow().isoformat() + "Z"
     seeds = [
         (
@@ -244,7 +429,7 @@ def _seed_lawns(conn: sqlite3.Connection) -> None:
             )
 
 
-def row_to_dict(row: sqlite3.Row | None) -> dict | None:
+def row_to_dict(row: Row | sqlite3.Row | None) -> dict | None:
     if row is None:
         return None
     return {k: row[k] for k in row.keys()}
