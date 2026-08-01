@@ -66,6 +66,7 @@ def migrate(conn: sqlite3.Connection) -> None:
           dog_warning TEXT NOT NULL DEFAULT 'none',
           gate_code TEXT NOT NULL DEFAULT '',
           phone TEXT NOT NULL DEFAULT '',
+          mower TEXT NOT NULL DEFAULT 'john_deere_60_ztrak',
           planned_mow_date TEXT,
           active INTEGER NOT NULL DEFAULT 1,
           created_at TEXT NOT NULL,
@@ -101,6 +102,10 @@ def migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE lawns ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
     if "planned_mow_date" not in cols:
         conn.execute("ALTER TABLE lawns ADD COLUMN planned_mow_date TEXT")
+    if "mower" not in cols:
+        conn.execute(
+            "ALTER TABLE lawns ADD COLUMN mower TEXT NOT NULL DEFAULT 'john_deere_60_ztrak'"
+        )
 
     row = conn.execute("SELECT id FROM settings WHERE id = 1").fetchone()
     if not row:

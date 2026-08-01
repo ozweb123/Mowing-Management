@@ -7,6 +7,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api, ClientApiError } from "@/lib/client-api";
 import { dollars } from "@/lib/forecast";
+import { MOWER_OPTIONS, type MowerCode } from "@/lib/mowers";
 import type { Lawn, LawnForecast, MowingRecord } from "@/lib/types";
 
 export default function LawnDetailPage() {
@@ -19,6 +20,7 @@ export default function LawnDetailPage() {
   const [charge, setCharge] = useState("");
   const [notes, setNotes] = useState("");
   const [phone, setPhone] = useState("");
+  const [mower, setMower] = useState<MowerCode>("john_deere_60_ztrak");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -28,6 +30,7 @@ export default function LawnDetailPage() {
       setCharge(String(l.chargeCents / 100));
       setNotes(l.notes);
       setPhone(l.phone || "");
+      setMower(l.mower || "john_deere_60_ztrak");
       const mows = await api<MowingRecord[]>(
         `/api/mowings?lawnId=${id}&limit=20`
       );
@@ -58,6 +61,7 @@ export default function LawnDetailPage() {
           chargeDollars: Number(charge),
           notes,
           phone,
+          mower,
         }),
       });
       await load();
@@ -74,6 +78,22 @@ export default function LawnDetailPage() {
       body: JSON.stringify({ paymentStatus: "paid" }),
     });
     await load();
+  }
+
+  async function deleteForever() {
+    if (!lawn) return;
+    if (
+      !confirm(
+        `Permanently delete "${lawn.name}" and all its mow history? This cannot be undone.`
+      )
+    )
+      return;
+    try {
+      await api(`/api/lawns/${lawn.id}?hard=1`, { method: "DELETE" });
+      router.push("/lawns");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Delete failed.");
+    }
   }
 
   if (!lawn) {
@@ -141,6 +161,23 @@ export default function LawnDetailPage() {
           />
         </div>
         <div>
+          <label className="label" htmlFor="mower">
+            Mower for this job
+          </label>
+          <select
+            id="mower"
+            className="input"
+            value={mower}
+            onChange={(e) => setMower(e.target.value as MowerCode)}
+          >
+            {(Object.keys(MOWER_OPTIONS) as MowerCode[]).map((code) => (
+              <option key={code} value={code}>
+                {MOWER_OPTIONS[code]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className="label" htmlFor="notes">
             Notes
           </label>
@@ -155,6 +192,14 @@ export default function LawnDetailPage() {
           {busy ? "Saving…" : "Save changes"}
         </button>
       </form>
+
+      <button
+        type="button"
+        className="btn-danger mb-4 w-full"
+        onClick={() => void deleteForever()}
+      >
+        Delete forever
+      </button>
 
       <h3 className="mb-2 font-display text-lg font-bold">Mow history</h3>
       <ul className="space-y-2">

@@ -8,6 +8,7 @@ export type ScheduleType = "recurring" | "adhoc";
 export type PaymentStatus = "paid" | "owes" | "partial";
 export type DogWarning = "none" | "friendly" | "caution" | "do_not_enter";
 export type DueStatus = "ok" | "due_soon" | "due" | "overdue" | "skip_rain";
+export type MowerCode = "bad_boy_54" | "john_deere_60_ztrak";
 
 export interface Lawn {
   id: string;
@@ -27,6 +28,8 @@ export interface Lawn {
   gateCode: string;
   /** Customer phone for "On my way" SMS (digits / + allowed). */
   phone: string;
+  /** Which machine Miles plans to run on this yard. */
+  mower: MowerCode;
   active: boolean;
   createdAt: string;
   updatedAt: string;

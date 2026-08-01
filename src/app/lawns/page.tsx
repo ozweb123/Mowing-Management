@@ -6,6 +6,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api, ClientApiError } from "@/lib/client-api";
 import { dollars } from "@/lib/forecast";
+import { MOWER_OPTIONS, mowerLabel, type MowerCode } from "@/lib/mowers";
 import type { Lawn } from "@/lib/types";
 
 const emptyForm = {
@@ -18,6 +19,7 @@ const emptyForm = {
   dogWarning: "none",
   gateCode: "",
   phone: "",
+  mower: "john_deere_60_ztrak" as MowerCode,
   routeOrder: "100",
 };
 
@@ -64,10 +66,26 @@ export default function LawnsPage() {
     }
   }
 
-  async function remove(id: string) {
-    if (!confirm("Remove this lawn from the active schedule?")) return;
+  async function deactivate(id: string) {
+    if (!confirm("Deactivate this lawn? It leaves the schedule but stays in the list."))
+      return;
     try {
       await api(`/api/lawns/${id}`, { method: "DELETE" });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Deactivate failed.");
+    }
+  }
+
+  async function deleteForever(id: string, name: string) {
+    if (
+      !confirm(
+        `Permanently delete "${name}" and all its mow history? This cannot be undone.`
+      )
+    )
+      return;
+    try {
+      await api(`/api/lawns/${id}?hard=1`, { method: "DELETE" });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Delete failed.");
@@ -202,6 +220,25 @@ export default function LawnsPage() {
             </div>
           </div>
           <div>
+            <label className="label" htmlFor="mower">
+              Mower for this job
+            </label>
+            <select
+              id="mower"
+              className="input"
+              value={form.mower}
+              onChange={(e) =>
+                setForm({ ...form, mower: e.target.value as MowerCode })
+              }
+            >
+              {(Object.keys(MOWER_OPTIONS) as MowerCode[]).map((code) => (
+                <option key={code} value={code}>
+                  {MOWER_OPTIONS[code]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="label" htmlFor="notes">
               Notes (gate, HOA, clippings…)
             </label>
@@ -265,6 +302,9 @@ export default function LawnsPage() {
                   {lawn.phone ? ` · ${lawn.phone}` : ""}
                   {!lawn.active ? " · inactive" : ""}
                 </p>
+                <p className="text-xs font-semibold text-jd-green-dark">
+                  Mower: {mowerLabel(lawn.mower)}
+                </p>
               </div>
               <div className="flex shrink-0 flex-col gap-1">
                 {lawn.active ? (
@@ -285,14 +325,21 @@ export default function LawnsPage() {
                     >
                       ↓
                     </button>
+                    <button
+                      type="button"
+                      className="text-sm font-bold text-jd-warn"
+                      onClick={() => void deactivate(lawn.id)}
+                    >
+                      Deactivate
+                    </button>
                   </>
                 ) : null}
                 <button
                   type="button"
                   className="text-sm font-bold text-jd-danger"
-                  onClick={() => void remove(lawn.id)}
+                  onClick={() => void deleteForever(lawn.id, lawn.name)}
                 >
-                  Remove
+                  Delete forever
                 </button>
               </div>
             </div>

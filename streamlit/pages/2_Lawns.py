@@ -1,4 +1,4 @@
-"""Lawn CRUD + route reorder."""
+"""Lawn CRUD + route reorder + hard delete + mower choice."""
 
 from __future__ import annotations
 
@@ -13,9 +13,11 @@ import streamlit as st
 
 from lib.auth import require_login
 from lib.db import dollars, get_conn
+from lib.mowers import DEFAULT_MOWER, MOWER_OPTIONS, mower_label
 from lib.services import (
     create_lawn,
     deactivate_lawn,
+    delete_lawn_forever,
     list_lawns,
     reorder_lawns,
     update_lawn,
@@ -28,6 +30,8 @@ get_conn()
 require_login()
 brand_header("Yards on your route — recurring or one-time.")
 
+mower_codes = list(MOWER_OPTIONS.keys())
+
 with st.expander("+ Add lawn", expanded=False):
     with st.form("add_lawn"):
         name = st.text_input("Name", placeholder="Johnson")
@@ -39,6 +43,12 @@ with st.expander("+ Add lawn", expanded=False):
         schedule = col3.selectbox("Schedule", ["recurring", "adhoc"])
         dog = col4.selectbox(
             "Dog", ["none", "friendly", "caution", "do_not_enter"]
+        )
+        mower = st.selectbox(
+            "Mower for this job",
+            options=mower_codes,
+            format_func=lambda c: MOWER_OPTIONS[c],
+            index=mower_codes.index(DEFAULT_MOWER),
         )
         phone = st.text_input("Phone (On my way)", placeholder="785-555-0100")
         gate = st.text_input("Gate code")
@@ -55,6 +65,7 @@ with st.expander("+ Add lawn", expanded=False):
                         "size": size,
                         "schedule_type": schedule,
                         "dog_warning": dog,
+                        "mower": mower,
                         "phone": phone.strip(),
                         "gate_code": gate.strip(),
                         "notes": notes.strip(),
@@ -67,7 +78,7 @@ st.caption("Route order — use ↑ ↓ to match how you drive")
 lawns = list_lawns(include_inactive=True)
 active = [l for l in lawns if l["active"]]
 
-for idx, lawn in enumerate(lawns):
+for lawn in lawns:
     with st.container(border=True):
         title = lawn["name"] + ("" if lawn["active"] else " (inactive)")
         st.markdown(f"### {title}")
@@ -76,6 +87,7 @@ for idx, lawn in enumerate(lawns):
             f"{lawn['schedule_type']}"
             + (f" · {lawn['phone']}" if lawn.get("phone") else "")
         )
+        st.caption(f"Mower: {mower_label(lawn.get('mower'))}")
         if lawn.get("notes"):
             st.caption(lawn["notes"])
 
@@ -97,9 +109,40 @@ for idx, lawn in enumerate(lawns):
                     st.rerun()
             if c3.button("Edit", key=f"ed_{lawn['id']}", use_container_width=True):
                 st.session_state[f"editing_{lawn['id']}"] = True
-            if c4.button("Remove", key=f"rm_{lawn['id']}", use_container_width=True):
+            if c4.button("Deactivate", key=f"rm_{lawn['id']}", use_container_width=True):
                 deactivate_lawn(lawn["id"])
                 st.rerun()
+        else:
+            st.warning("Inactive — not on Today. Delete forever to wipe it + history.")
+
+        # Hard delete available for active + inactive
+        confirm_key = f"confirm_del_{lawn['id']}"
+        if st.session_state.get(confirm_key):
+            st.error(
+                f"Permanently delete **{lawn['name']}** and all its mow history? "
+                "This cannot be undone."
+            )
+            d1, d2 = st.columns(2)
+            if d1.button(
+                "Yes — delete forever",
+                key=f"yes_del_{lawn['id']}",
+                type="primary",
+                use_container_width=True,
+            ):
+                delete_lawn_forever(lawn["id"])
+                st.session_state.pop(confirm_key, None)
+                st.success(f"Deleted {lawn['name']}.")
+                st.rerun()
+            if d2.button("Cancel", key=f"no_del_{lawn['id']}", use_container_width=True):
+                st.session_state.pop(confirm_key, None)
+                st.rerun()
+        elif st.button(
+            "Delete forever",
+            key=f"del_{lawn['id']}",
+            use_container_width=True,
+        ):
+            st.session_state[confirm_key] = True
+            st.rerun()
 
         if st.session_state.get(f"editing_{lawn['id']}"):
             with st.form(f"edit_{lawn['id']}"):
@@ -110,12 +153,26 @@ for idx, lawn in enumerate(lawns):
                     value=float(lawn["charge_cents"]) / 100,
                     step=5.0,
                 )
+                current_mower = lawn.get("mower") or DEFAULT_MOWER
+                if current_mower not in mower_codes:
+                    current_mower = DEFAULT_MOWER
+                mower = st.selectbox(
+                    "Mower for this job",
+                    options=mower_codes,
+                    format_func=lambda c: MOWER_OPTIONS[c],
+                    index=mower_codes.index(current_mower),
+                )
+                reactivate = False
+                if not lawn["active"]:
+                    reactivate = st.checkbox("Reactivate this lawn")
                 if st.form_submit_button("Save changes", type="primary"):
                     update_lawn(
                         lawn["id"],
                         phone=phone.strip(),
                         notes=notes.strip(),
                         charge_dollars=charge,
+                        mower=mower,
+                        **({"active": True} if reactivate else {}),
                     )
                     st.session_state[f"editing_{lawn['id']}"] = False
                     st.rerun()

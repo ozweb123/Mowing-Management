@@ -5,8 +5,9 @@
 import { v4 as uuid } from "uuid";
 import { getDb } from "./db";
 import { NotFoundError } from "./errors";
-import type { Lawn, LawnSize, ScheduleType, DogWarning } from "./types";
+import type { Lawn, LawnSize, ScheduleType, DogWarning, MowerCode } from "./types";
 import type { LawnCreateInput } from "./validation";
+import { DEFAULT_MOWER } from "./mowers";
 
 type LawnRow = {
   id: string;
@@ -22,6 +23,7 @@ type LawnRow = {
   dog_warning: DogWarning;
   gate_code: string;
   phone: string;
+  mower: MowerCode | null;
   active: number;
   created_at: string;
   updated_at: string;
@@ -42,6 +44,7 @@ export function rowToLawn(r: LawnRow): Lawn {
     dogWarning: r.dog_warning,
     gateCode: r.gate_code,
     phone: r.phone ?? "",
+    mower: r.mower ?? DEFAULT_MOWER,
     active: !!r.active,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -80,8 +83,8 @@ export function createLawn(input: LawnCreateInput): Lawn {
   db.prepare(
     `INSERT INTO lawns (
       id, name, address, city, notes, charge_cents, size, schedule_type,
-      interval_days, route_order, dog_warning, gate_code, phone, active, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      interval_days, route_order, dog_warning, gate_code, phone, mower, active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.name,
@@ -96,6 +99,7 @@ export function createLawn(input: LawnCreateInput): Lawn {
     input.dogWarning,
     input.gateCode,
     input.phone,
+    input.mower ?? DEFAULT_MOWER,
     input.active ? 1 : 0,
     now,
     now
@@ -130,13 +134,14 @@ export function updateLawn(
   const dogWarning = input.dogWarning ?? existing.dogWarning;
   const gateCode = input.gateCode ?? existing.gateCode;
   const phone = input.phone ?? existing.phone;
+  const mower = input.mower ?? existing.mower;
   const active = input.active ?? existing.active;
 
   db.prepare(
     `UPDATE lawns SET
       name = ?, address = ?, city = ?, notes = ?, charge_cents = ?,
       size = ?, schedule_type = ?, interval_days = ?, route_order = ?,
-      dog_warning = ?, gate_code = ?, phone = ?, active = ?, updated_at = ?
+      dog_warning = ?, gate_code = ?, phone = ?, mower = ?, active = ?, updated_at = ?
      WHERE id = ?`
   ).run(
     name,
@@ -151,6 +156,7 @@ export function updateLawn(
     dogWarning,
     gateCode,
     phone,
+    mower,
     active ? 1 : 0,
     now,
     id
@@ -168,10 +174,12 @@ export function deactivateLawn(id: string): void {
   ).run(new Date().toISOString(), id);
 }
 
-/** Hard delete (only if no mowings, or cascade). */
+/** Hard delete — removes lawn and cascading mow history. */
 export function deleteLawn(id: string): void {
   getLawn(id);
   const db = getDb();
+  // Explicit mowing wipe + lawn row (FK CASCADE also covers mowings).
+  db.prepare(`DELETE FROM mowings WHERE lawn_id = ?`).run(id);
   db.prepare(`DELETE FROM lawns WHERE id = ?`).run(id);
 }
 

@@ -57,6 +57,8 @@ function migrate(db: Database.Database) {
         CHECK (dog_warning IN ('none','friendly','caution','do_not_enter')),
       gate_code TEXT NOT NULL DEFAULT '',
       phone TEXT NOT NULL DEFAULT '',
+      mower TEXT NOT NULL DEFAULT 'john_deere_60_ztrak'
+        CHECK (mower IN ('bad_boy_54','john_deere_60_ztrak')),
       active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -105,6 +107,11 @@ function migrate(db: Database.Database) {
   }>;
   if (!lawnCols.some((c) => c.name === "phone")) {
     db.exec(`ALTER TABLE lawns ADD COLUMN phone TEXT NOT NULL DEFAULT ''`);
+  }
+  if (!lawnCols.some((c) => c.name === "mower")) {
+    db.exec(
+      `ALTER TABLE lawns ADD COLUMN mower TEXT NOT NULL DEFAULT 'john_deere_60_ztrak'`
+    );
   }
 
   // Seed default settings + demo lawns on first run.
@@ -183,8 +190,8 @@ function seedDemoLawns(db: Database.Database) {
   const insertLawn = db.prepare(`
     INSERT INTO lawns (
       id, name, address, city, notes, charge_cents, size, schedule_type,
-      interval_days, route_order, dog_warning, gate_code, phone, active, created_at, updated_at
-    ) VALUES (?, ?, ?, 'Topeka, KS', ?, ?, ?, ?, NULL, ?, ?, ?, ?, 1, ?, ?)
+      interval_days, route_order, dog_warning, gate_code, phone, mower, active, created_at, updated_at
+    ) VALUES (?, ?, ?, 'Topeka, KS', ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'john_deere_60_ztrak', 1, ?, ?)
   `);
 
   const insertMow = db.prepare(`

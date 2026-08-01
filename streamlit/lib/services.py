@@ -27,15 +27,20 @@ def get_lawn(lawn_id: str) -> dict[str, Any] | None:
 
 
 def create_lawn(data: dict[str, Any]) -> dict[str, Any]:
+    from lib.mowers import DEFAULT_MOWER, MOWER_OPTIONS
+
     now = datetime.utcnow().isoformat() + "Z"
     lid = str(uuid.uuid4())
+    mower = data.get("mower") or DEFAULT_MOWER
+    if mower not in MOWER_OPTIONS:
+        mower = DEFAULT_MOWER
     get_conn().execute(
         """
         INSERT INTO lawns (
           id, name, address, city, notes, charge_cents, size, schedule_type,
-          interval_days, route_order, dog_warning, gate_code, phone, active,
+          interval_days, route_order, dog_warning, gate_code, phone, mower, active,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
         """,
         (
             lid,
@@ -51,6 +56,7 @@ def create_lawn(data: dict[str, Any]) -> dict[str, Any]:
             data.get("dog_warning", "none"),
             data.get("gate_code", ""),
             data.get("phone", ""),
+            mower,
             now,
             now,
         ),
@@ -60,9 +66,13 @@ def create_lawn(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def update_lawn(lawn_id: str, **fields: Any) -> dict[str, Any] | None:
+    from lib.mowers import MOWER_OPTIONS
+
     lawn = get_lawn(lawn_id)
     if not lawn:
         return None
+    if "mower" in fields and fields["mower"] not in MOWER_OPTIONS:
+        fields = {**fields, "mower": lawn.get("mower")}
     mapping = {
         "name": "name",
         "address": "address",
@@ -72,6 +82,7 @@ def update_lawn(lawn_id: str, **fields: Any) -> dict[str, Any] | None:
         "dog_warning": "dog_warning",
         "gate_code": "gate_code",
         "phone": "phone",
+        "mower": "mower",
         "route_order": "route_order",
         "planned_mow_date": "planned_mow_date",
     }
@@ -97,6 +108,16 @@ def update_lawn(lawn_id: str, **fields: Any) -> dict[str, Any] | None:
 
 def deactivate_lawn(lawn_id: str) -> None:
     update_lawn(lawn_id, active=False)
+
+
+def delete_lawn_forever(lawn_id: str) -> None:
+    """Hard delete lawn + cascading mow history. Gone for good."""
+    if not get_lawn(lawn_id):
+        raise ValueError("Lawn not found")
+    conn = get_conn()
+    conn.execute("DELETE FROM mowings WHERE lawn_id = ?", (lawn_id,))
+    conn.execute("DELETE FROM lawns WHERE id = ?", (lawn_id,))
+    conn.commit()
 
 
 def reorder_lawns(ordered_ids: list[str]) -> None:

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { StatusBadge } from "./StatusBadge";
 import { api, mapsUrl, smsUrl } from "@/lib/client-api";
 import { dollars } from "@/lib/forecast";
+import { mowerLabel } from "@/lib/mowers";
 import type { TodayJob } from "@/lib/types";
 
 const dogLabel: Record<string, string> = {
@@ -60,6 +61,9 @@ export function JobCard({
           <p className="text-sm text-jd-soil/75">
             {lawn.address || "No address"} · {dollars(lawn.chargeCents)} ·{" "}
             {job.estimatedMinutes} min
+          </p>
+          <p className="text-xs font-semibold text-jd-green-dark">
+            Mower: {mowerLabel(lawn.mower)}
           </p>
         </div>
         <StatusBadge status={forecast.dueStatus} />

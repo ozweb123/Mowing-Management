@@ -25,6 +25,7 @@ export const dogWarningSchema = z.enum([
   "caution",
   "do_not_enter",
 ]);
+export const mowerSchema = z.enum(["bad_boy_54", "john_deere_60_ztrak"]);
 export const paymentStatusSchema = z.enum(["paid", "owes", "partial"]);
 export const expenseCategorySchema = z.enum([
   "gas",
@@ -54,6 +55,7 @@ export const lawnCreateSchema = z.object({
       (v) => v === "" || /^[+\d][\d\s().-]{6,28}$/.test(v),
       "Phone looks invalid."
     ),
+  mower: mowerSchema.default("john_deere_60_ztrak"),
   active: z.boolean().default(true),
 });
 

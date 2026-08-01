@@ -16,6 +16,7 @@ import streamlit as st
 
 from lib.auth import require_login
 from lib.db import get_conn
+from lib.mowers import mower_label
 from lib.services import (
     build_today,
     clear_rain_push,
@@ -115,6 +116,7 @@ else:
                 f"{lawn['address'] or 'No address'} · "
                 f"{dollars(lawn['charge_cents'])} · {job['estimated_minutes']} min"
             )
+            st.caption(f"Mower: {mower_label(lawn.get('mower'))}")
             if lawn.get("dog_warning") and lawn["dog_warning"] != "none":
                 st.warning(f"Dog: {lawn['dog_warning'].replace('_', ' ')}")
             if lawn.get("notes"):
