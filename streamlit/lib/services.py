@@ -67,7 +67,7 @@ def create_lawn(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _notify_calendar() -> None:
-    """Mark iCloud calendar dirty so auto-sync picks up schedule changes."""
+    """Mark dirty and schedule background iCloud auto-sync."""
     try:
         from lib.calendar_sync import mark_calendar_dirty
 

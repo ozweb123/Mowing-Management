@@ -1,5 +1,5 @@
 """
-Shared page bootstrap — run pending iCloud calendar auto-sync after login.
+Shared page bootstrap — drain leftover iCloud calendar sync if needed.
 """
 
 from __future__ import annotations
@@ -9,26 +9,39 @@ import streamlit as st
 
 def run_pending_calendar_sync() -> None:
     """
-    If the schedule is dirty and auto-sync is enabled, push to iCloud.
-    Shows a subtle status once per successful/failed sync in the session.
+    Backup path: if the schedule is still dirty and no background timer is
+    already queued, push to iCloud on this page load.
     """
     try:
-        from lib.calendar_sync import get_calendar_sync_state, maybe_auto_sync
+        from lib.calendar_sync import (
+            background_sync_pending,
+            get_calendar_sync_state,
+            maybe_auto_sync,
+            schedule_background_sync,
+        )
     except Exception:
         return
 
     state = get_calendar_sync_state()
     if not state["configured"] or not state["auto_sync"] or not state["dirty"]:
-        # Still surface last error lightly if any
         return
 
+    # Prefer the quiet background path — don't block the UI again.
+    if background_sync_pending():
+        return
+
+    # Re-arm background sync (e.g. after a redeploy wiped in-memory timers).
+    schedule_background_sync()
+    if background_sync_pending():
+        return
+
+    # Fallback: sync inline if we couldn't schedule a timer.
     with st.spinner("Updating iPhone calendar…"):
         result = maybe_auto_sync(force=False, debounce=True)
 
     if not result:
         return
     if result.get("error"):
-        # Don't spam every rerun — only when we attempted
         key = "cal_sync_err_shown"
         if st.session_state.get(key) != result["error"]:
             st.warning(
@@ -38,7 +51,6 @@ def run_pending_calendar_sync() -> None:
             st.session_state[key] = result["error"]
     else:
         st.session_state.pop("cal_sync_err_shown", None)
-        # Quiet success — avoid noisy banners every Done tap
         st.toast(
             f"Calendar updated ({result.get('total', 0)} jobs)",
             icon="📅",

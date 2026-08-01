@@ -14,9 +14,7 @@ import streamlit as st
 from lib.auth import logout, require_login, update_pin
 from lib.calendar_ics import build_ics
 from lib.calendar_sync import (
-    caldav_configured,
     get_calendar_sync_state,
-    maybe_auto_sync,
     set_calendar_auto_sync,
     sync_schedule_to_icloud,
 )
@@ -126,9 +124,9 @@ if st.button("Save free time", type="primary", use_container_width=True):
 
 st.subheader("iPhone / iCloud calendar")
 st.caption(
-    "With iCloud secrets set, the schedule **auto-syncs** when Miles changes "
-    "the plan (Done, Week pins, rain push, lawn edits). "
-    "Apple Calendar picks it up via the **Miles Mowing** iCloud calendar."
+    "With iCloud secrets set, the schedule syncs **by itself** a few seconds "
+    "after Miles changes the plan (Done, Week pins, rain push, lawn edits). "
+    "No Sync button needed. Jobs land on the **Miles Mowing** iCloud calendar."
 )
 
 cal_state = get_calendar_sync_state()
@@ -141,17 +139,17 @@ if auto != cal_state["auto_sync"]:
     st.rerun()
 
 if cal_state["configured"]:
-    st.success("iCloud connected — auto-sync is ready.")
+    st.success("iCloud connected — syncs automatically in the background.")
     if cal_state["last_sync_at"]:
         st.caption(f"Last sync: {cal_state['last_sync_at']}")
     if cal_state["dirty"] and cal_state["auto_sync"]:
-        st.info("Schedule changed — will sync on the next page load.")
+        st.info("Schedule changed — pushing to iPhone calendar shortly…")
     if cal_state["last_error"]:
         st.warning(f"Last sync error: {cal_state['last_error']}")
 
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("Sync now", type="primary", use_container_width=True):
+    with st.expander("Manual sync (optional)"):
+        st.caption("Only needed if auto-sync was off or something failed.")
+        if st.button("Sync now", use_container_width=True):
             try:
                 result = sync_schedule_to_icloud(10)
                 st.success(
@@ -160,15 +158,6 @@ if cal_state["configured"]:
                 )
             except Exception as e:
                 st.error(f"Sync failed: {e}")
-    with c2:
-        if st.button("Sync pending now", use_container_width=True):
-            result = maybe_auto_sync(force=True, debounce=False)
-            if result and result.get("error"):
-                st.error(result["error"])
-            elif result:
-                st.success(f"Synced {result.get('total', 0)} jobs.")
-            else:
-                st.info("Nothing pending (or auto-sync off).")
     st.caption(
         "On iPhone: Calendar → calendars list → enable **Miles Mowing** under iCloud."
     )
@@ -186,7 +175,7 @@ else:
         """
 1. [appleid.apple.com](https://appleid.apple.com) → **App-Specific Passwords**  
 2. Paste into Streamlit Cloud → **Secrets** → Restart app  
-3. Leave **Auto-sync** on — Miles won’t need to tap Sync
+3. Leave **Auto-sync** on — the phone calendar updates itself
 """
     )
 
