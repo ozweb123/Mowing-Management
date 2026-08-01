@@ -29,6 +29,13 @@ def update_pin(new_pin: str) -> None:
 def require_login() -> bool:
     """Return True if signed in; otherwise render login and stop."""
     if st.session_state.get("authed"):
+        # Drain any pending iCloud calendar sync from earlier schedule edits.
+        try:
+            from lib.bootstrap import run_pending_calendar_sync
+
+            run_pending_calendar_sync()
+        except Exception:
+            pass
         return True
 
     st.markdown("### Miles Mowing Management")

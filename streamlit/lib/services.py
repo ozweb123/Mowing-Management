@@ -62,7 +62,18 @@ def create_lawn(data: dict[str, Any]) -> dict[str, Any]:
         ),
     )
     get_conn().commit()
+    _notify_calendar()
     return get_lawn(lid)  # type: ignore[return-value]
+
+
+def _notify_calendar() -> None:
+    """Mark iCloud calendar dirty so auto-sync picks up schedule changes."""
+    try:
+        from lib.calendar_sync import mark_calendar_dirty
+
+        mark_calendar_dirty()
+    except Exception:
+        pass
 
 
 def update_lawn(lawn_id: str, **fields: Any) -> dict[str, Any] | None:
@@ -103,6 +114,21 @@ def update_lawn(lawn_id: str, **fields: Any) -> dict[str, Any] | None:
     vals.append(lawn_id)
     get_conn().execute(f"UPDATE lawns SET {', '.join(sets)} WHERE id = ?", vals)
     get_conn().commit()
+    # Schedule-relevant field changes should refresh the calendar.
+    if any(
+        k in fields
+        for k in (
+            "name",
+            "address",
+            "mower",
+            "planned_mow_date",
+            "active",
+            "route_order",
+            "charge_dollars",
+            "notes",
+        )
+    ):
+        _notify_calendar()
     return get_lawn(lawn_id)
 
 
@@ -118,6 +144,7 @@ def delete_lawn_forever(lawn_id: str) -> None:
     conn.execute("DELETE FROM mowings WHERE lawn_id = ?", (lawn_id,))
     conn.execute("DELETE FROM lawns WHERE id = ?", (lawn_id,))
     conn.commit()
+    _notify_calendar()
 
 
 def reorder_lawns(ordered_ids: list[str]) -> None:
@@ -129,6 +156,7 @@ def reorder_lawns(ordered_ids: list[str]) -> None:
             ((idx + 1) * 10, now, lid),
         )
     conn.commit()
+    _notify_calendar()
 
 
 def last_mowed_at(lawn_id: str) -> str | None:
@@ -174,6 +202,7 @@ def create_mowing(
         (now, lawn_id),
     )
     get_conn().commit()
+    _notify_calendar()
     return dict(
         get_conn().execute("SELECT * FROM mowings WHERE id = ?", (mid,)).fetchone()
     )
@@ -262,12 +291,14 @@ def rain_push(days: int = 1) -> str:
         "UPDATE settings SET rain_push_until = ? WHERE id = 1", (iso,)
     )
     get_conn().commit()
+    _notify_calendar()
     return iso
 
 
 def clear_rain_push() -> None:
     get_conn().execute("UPDATE settings SET rain_push_until = NULL WHERE id = 1")
     get_conn().commit()
+    _notify_calendar()
 
 
 def build_today() -> dict[str, Any]:
@@ -594,6 +625,7 @@ def add_expense(category: str, amount_dollars: float, note: str = "") -> None:
 
 def set_planned_date(lawn_id: str, date: str | None) -> None:
     update_lawn(lawn_id, planned_mow_date=date)
+    # update_lawn already notifies when planned_mow_date is set
 
 
 def maps_url(address: str, city: str) -> str:

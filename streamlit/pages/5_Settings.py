@@ -13,7 +13,13 @@ import streamlit as st
 
 from lib.auth import logout, require_login, update_pin
 from lib.calendar_ics import build_ics
-from lib.calendar_sync import caldav_configured, sync_schedule_to_icloud
+from lib.calendar_sync import (
+    caldav_configured,
+    get_calendar_sync_state,
+    maybe_auto_sync,
+    set_calendar_auto_sync,
+    sync_schedule_to_icloud,
+)
 from lib.capacity import fmt_hour, get_capacity_settings, save_capacity_settings
 from lib.db import get_conn
 from lib.services import (
@@ -120,53 +126,55 @@ if st.button("Save free time", type="primary", use_container_width=True):
 
 st.subheader("iPhone / iCloud calendar")
 st.caption(
-    "Get mow jobs onto Miles' iPhone Calendar. Two options — "
-    "**download/import**, or **push straight into iCloud** (best for schedule changes)."
+    "With iCloud secrets set, the schedule **auto-syncs** when Miles changes "
+    "the plan (Done, Week pins, rain push, lawn edits). "
+    "Apple Calendar picks it up via the **Miles Mowing** iCloud calendar."
 )
 
-ics_bytes = build_ics(10).encode("utf-8")
-st.download_button(
-    label="Download schedule (.ics)",
-    data=ics_bytes,
-    file_name="miles-mowing.ics",
-    mime="text/calendar",
-    use_container_width=True,
-    help="Open the file on iPhone → Add All. Re-download after big schedule changes.",
+cal_state = get_calendar_sync_state()
+auto = st.toggle(
+    "Auto-sync to iCloud when schedule changes",
+    value=cal_state["auto_sync"],
 )
+if auto != cal_state["auto_sync"]:
+    set_calendar_auto_sync(auto)
+    st.rerun()
 
-st.markdown(
-    """
-**Quick import (no Apple password):**  
-1. Tap **Download schedule (.ics)** on your iPhone  
-2. Share sheet → **Calendar** → **Add All**
-"""
-)
+if cal_state["configured"]:
+    st.success("iCloud connected — auto-sync is ready.")
+    if cal_state["last_sync_at"]:
+        st.caption(f"Last sync: {cal_state['last_sync_at']}")
+    if cal_state["dirty"] and cal_state["auto_sync"]:
+        st.info("Schedule changed — will sync on the next page load.")
+    if cal_state["last_error"]:
+        st.warning(f"Last sync error: {cal_state['last_error']}")
 
-st.markdown("#### Push to iCloud (keeps updates in sync)")
-if caldav_configured():
-    st.success("iCloud CalDAV secrets are configured on this app.")
-    if st.button(
-        "Sync schedule to iCloud Calendar now",
-        type="primary",
-        use_container_width=True,
-    ):
-        try:
-            result = sync_schedule_to_icloud(10)
-            st.success(
-                f"Synced to “{result['calendar']}”: "
-                f"{result['total']} jobs "
-                f"(+{result['created']} new, ~{result['updated']} updated, "
-                f"-{result['deleted']} removed)."
-            )
-            st.info(
-                "On iPhone: open Calendar → calendars list → make sure "
-                "**Miles Mowing** is checked under iCloud."
-            )
-        except Exception as e:
-            st.error(f"Sync failed: {e}")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("Sync now", type="primary", use_container_width=True):
+            try:
+                result = sync_schedule_to_icloud(10)
+                st.success(
+                    f"Synced “{result['calendar']}”: {result['total']} jobs "
+                    f"(+{result['created']} / ~{result['updated']} / -{result['deleted']})."
+                )
+            except Exception as e:
+                st.error(f"Sync failed: {e}")
+    with c2:
+        if st.button("Sync pending now", use_container_width=True):
+            result = maybe_auto_sync(force=True, debounce=False)
+            if result and result.get("error"):
+                st.error(result["error"])
+            elif result:
+                st.success(f"Synced {result.get('total', 0)} jobs.")
+            else:
+                st.info("Nothing pending (or auto-sync off).")
+    st.caption(
+        "On iPhone: Calendar → calendars list → enable **Miles Mowing** under iCloud."
+    )
 else:
     st.warning(
-        "To push into iCloud, add these in Streamlit Cloud → Settings → Secrets "
+        "Add iCloud secrets so sync can run automatically "
         "(use an **app-specific password**, not the normal Apple password):"
     )
     st.code(
@@ -176,12 +184,20 @@ else:
     )
     st.markdown(
         """
-1. Parent/Miles go to [appleid.apple.com](https://appleid.apple.com)  
-2. **Sign-In and Security → App-Specific Passwords → Generate**  
-3. Paste into Streamlit secrets → Restart app → tap **Sync** above  
-4. Creates/updates an iCloud calendar named **Miles Mowing**
+1. [appleid.apple.com](https://appleid.apple.com) → **App-Specific Passwords**  
+2. Paste into Streamlit Cloud → **Secrets** → Restart app  
+3. Leave **Auto-sync** on — Miles won’t need to tap Sync
 """
     )
+
+ics_bytes = build_ics(10).encode("utf-8")
+st.download_button(
+    label="Download schedule (.ics) backup",
+    data=ics_bytes,
+    file_name="miles-mowing.ics",
+    mime="text/calendar",
+    use_container_width=True,
+)
 
 cal_token = ensure_calendar_token()
 with st.expander("Advanced: subscribe feed token (Next.js host)"):

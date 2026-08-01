@@ -47,6 +47,12 @@ def save_capacity_settings(
         (start, end, json.dumps(blocked)),
     )
     get_conn().commit()
+    try:
+        from lib.calendar_sync import mark_calendar_dirty
+
+        mark_calendar_dirty()
+    except Exception:
+        pass
 
 
 def fmt_hour(h: int) -> str:

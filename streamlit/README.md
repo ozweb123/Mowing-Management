@@ -56,20 +56,21 @@ weather_timezone = "America/Chicago"
 - SQLite lives on the Cloud instance disk — fine for Miles’ solo use; wipe/redeploy can reset data (export later if needed).
 - Change the PIN after first login.
 
-## iPhone / iCloud calendar
+## iPhone / iCloud calendar (auto-sync)
 
 In the app: **Settings → iPhone / iCloud calendar**
 
-1. **Download .ics** — quick import into Calendar (re-download after big changes)
-2. **Push to iCloud (recommended for updates)** — add Streamlit secrets:
+Add Streamlit secrets (app-specific password from [appleid.apple.com](https://appleid.apple.com)):
 
 ```toml
 icloud_apple_id = "miles@icloud.com"
 icloud_app_password = "xxxx-xxxx-xxxx-xxxx"
 ```
 
-Create the app password at [appleid.apple.com](https://appleid.apple.com) → Sign-In and Security → App-Specific Passwords.  
-Then tap **Sync schedule to iCloud Calendar now** — creates/updates calendar **Miles Mowing**.
+Leave **Auto-sync to iCloud when schedule changes** ON (default).  
+Whenever Miles marks Done, pins a Week day, rain-pushes, or edits lawns, the app marks the calendar dirty and pushes to iCloud on the next page load (debounced ~45s). Creates/updates the **Miles Mowing** iCloud calendar.
+
+Manual **Sync now** is still available if you want an immediate push.
 
 ## What to send Miles
 
