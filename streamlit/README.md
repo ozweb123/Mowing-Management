@@ -53,8 +53,26 @@ weather_timezone = "America/Chicago"
 ### Notes / limits
 
 - **Free Community Cloud** apps sleep when idle; first open after sleep can take ~30–60s.
-- SQLite lives on the Cloud instance disk — fine for Miles’ solo use; wipe/redeploy can reset data (export later if needed).
+- **Without Turso**, local SQLite is wiped on every reboot/redeploy. Add Turso secrets (below) so lawns/money/history survive.
 - Change the PIN after first login.
+
+## Keep data across redeploys (Turso — free)
+
+Streamlit Cloud disk is temporary. Store the DB on **Turso** (free SQLite hosting):
+
+1. Sign up at [turso.tech](https://turso.tech) (Google/GitHub login is fine).
+2. **Create Database** → name it e.g. `miles-mowing` → create.
+3. Open the database → copy the **URL** (`libsql://…turso.io`).
+4. **Tokens** → **Create Token** → copy the token (shown once).
+5. Streamlit Cloud → your app → **Settings → Secrets** → add:
+
+```toml
+turso_database_url = "libsql://miles-mowing-YOURORG.turso.io"
+turso_auth_token = "eyJ..."
+```
+
+6. **Reboot** the app. Settings should show **Turso (persistent)**.
+7. Re-enter lawns once (first Turso DB is empty / demo-seeded). After that, redeploys keep the data.
 
 ## iPhone / iCloud calendar (auto-sync)
 
