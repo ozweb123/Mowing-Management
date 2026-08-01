@@ -50,3 +50,5 @@ mobile-test-screenshots/
 
 streamlit/.venv/
 mobile-test-screenshots/
+__pycache__/
+*.pyc
