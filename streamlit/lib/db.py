@@ -47,6 +47,7 @@ def migrate(conn: sqlite3.Connection) -> None:
           available_end_hour INTEGER NOT NULL DEFAULT 18,
           blocked_json TEXT NOT NULL DEFAULT '[]',
           rain_push_until TEXT,
+          calendar_token TEXT,
           base_lat REAL NOT NULL DEFAULT 39.0375,
           base_lon REAL NOT NULL DEFAULT -95.7250,
           timezone TEXT NOT NULL DEFAULT 'America/Chicago'
@@ -106,6 +107,12 @@ def migrate(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE lawns ADD COLUMN mower TEXT NOT NULL DEFAULT 'john_deere_60_ztrak'"
         )
+
+    settings_cols = {
+        r["name"] for r in conn.execute("PRAGMA table_info(settings)").fetchall()
+    }
+    if "calendar_token" not in settings_cols:
+        conn.execute("ALTER TABLE settings ADD COLUMN calendar_token TEXT")
 
     row = conn.execute("SELECT id FROM settings WHERE id = 1").fetchone()
     if not row:

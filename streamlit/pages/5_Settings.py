@@ -12,9 +12,18 @@ if str(ROOT) not in sys.path:
 import streamlit as st
 
 from lib.auth import logout, require_login, update_pin
+from lib.calendar_ics import build_ics
+from lib.calendar_sync import caldav_configured, sync_schedule_to_icloud
 from lib.capacity import fmt_hour, get_capacity_settings, save_capacity_settings
 from lib.db import get_conn
-from lib.services import get_settings, list_mowings, list_lawns, update_settings
+from lib.services import (
+    ensure_calendar_token,
+    get_settings,
+    list_lawns,
+    list_mowings,
+    rotate_calendar_token,
+    update_settings,
+)
 from lib.ui import brand_header, inject_css
 
 st.set_page_config(page_title="Settings — Miles Mowing", layout="centered")
@@ -108,6 +117,87 @@ if st.button("Save free time", type="primary", use_container_width=True):
     save_capacity_settings(int(start), int(end), blocked)
     st.success("Free time saved.")
     st.rerun()
+
+st.subheader("iPhone / iCloud calendar")
+st.caption(
+    "Get mow jobs onto Miles' iPhone Calendar. Two options — "
+    "**download/import**, or **push straight into iCloud** (best for schedule changes)."
+)
+
+ics_bytes = build_ics(10).encode("utf-8")
+st.download_button(
+    label="Download schedule (.ics)",
+    data=ics_bytes,
+    file_name="miles-mowing.ics",
+    mime="text/calendar",
+    use_container_width=True,
+    help="Open the file on iPhone → Add All. Re-download after big schedule changes.",
+)
+
+st.markdown(
+    """
+**Quick import (no Apple password):**  
+1. Tap **Download schedule (.ics)** on your iPhone  
+2. Share sheet → **Calendar** → **Add All**
+"""
+)
+
+st.markdown("#### Push to iCloud (keeps updates in sync)")
+if caldav_configured():
+    st.success("iCloud CalDAV secrets are configured on this app.")
+    if st.button(
+        "Sync schedule to iCloud Calendar now",
+        type="primary",
+        use_container_width=True,
+    ):
+        try:
+            result = sync_schedule_to_icloud(10)
+            st.success(
+                f"Synced to “{result['calendar']}”: "
+                f"{result['total']} jobs "
+                f"(+{result['created']} new, ~{result['updated']} updated, "
+                f"-{result['deleted']} removed)."
+            )
+            st.info(
+                "On iPhone: open Calendar → calendars list → make sure "
+                "**Miles Mowing** is checked under iCloud."
+            )
+        except Exception as e:
+            st.error(f"Sync failed: {e}")
+else:
+    st.warning(
+        "To push into iCloud, add these in Streamlit Cloud → Settings → Secrets "
+        "(use an **app-specific password**, not the normal Apple password):"
+    )
+    st.code(
+        'icloud_apple_id = "you@icloud.com"\n'
+        'icloud_app_password = "xxxx-xxxx-xxxx-xxxx"',
+        language="toml",
+    )
+    st.markdown(
+        """
+1. Parent/Miles go to [appleid.apple.com](https://appleid.apple.com)  
+2. **Sign-In and Security → App-Specific Passwords → Generate**  
+3. Paste into Streamlit secrets → Restart app → tap **Sync** above  
+4. Creates/updates an iCloud calendar named **Miles Mowing**
+"""
+    )
+
+cal_token = ensure_calendar_token()
+with st.expander("Advanced: subscribe feed token (Next.js host)"):
+    st.caption(
+        "If you also host the Next.js app, iPhone can subscribe to a live feed that "
+        "refreshes every few hours — no CalDAV password needed."
+    )
+    st.code(f"/api/calendar?token={cal_token}", language="text")
+    st.markdown(
+        "On iPhone: **Settings → Calendar → Accounts → Add Account → Other → "
+        "Add Subscribed Calendar** → paste `https://YOUR-NEXTJS-HOST/api/calendar?token=…`"
+    )
+    if st.button("Rotate calendar token"):
+        rotate_calendar_token()
+        st.success("Token rotated — update any subscribed calendars.")
+        st.rerun()
 
 st.subheader("Recent mow history")
 lawns = {l["id"]: l["name"] for l in list_lawns(True)}

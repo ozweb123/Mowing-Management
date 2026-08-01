@@ -37,7 +37,8 @@ function migrate(db: Database.Database) {
       base_lat REAL NOT NULL DEFAULT 39.0375,
       base_lon REAL NOT NULL DEFAULT -95.7250,
       timezone TEXT NOT NULL DEFAULT 'America/Chicago',
-      rain_push_until TEXT
+      rain_push_until TEXT,
+      calendar_token TEXT
     );
 
     CREATE TABLE IF NOT EXISTS lawns (
@@ -112,6 +113,12 @@ function migrate(db: Database.Database) {
     db.exec(
       `ALTER TABLE lawns ADD COLUMN mower TEXT NOT NULL DEFAULT 'john_deere_60_ztrak'`
     );
+  }
+  const settingsCols = db.prepare(`PRAGMA table_info(settings)`).all() as Array<{
+    name: string;
+  }>;
+  if (!settingsCols.some((c) => c.name === "calendar_token")) {
+    db.exec(`ALTER TABLE settings ADD COLUMN calendar_token TEXT`);
   }
 
   // Seed default settings + demo lawns on first run.

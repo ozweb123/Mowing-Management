@@ -208,6 +208,34 @@ def get_settings() -> dict[str, Any]:
     return dict(get_conn().execute("SELECT * FROM settings WHERE id = 1").fetchone())
 
 
+def ensure_calendar_token() -> str:
+    """Stable secret token for calendar subscribe links."""
+    import secrets as pysecrets
+
+    row = get_conn().execute(
+        "SELECT calendar_token FROM settings WHERE id = 1"
+    ).fetchone()
+    token = row["calendar_token"] if row else None
+    if not token:
+        token = pysecrets.token_urlsafe(24)
+        get_conn().execute(
+            "UPDATE settings SET calendar_token = ? WHERE id = 1", (token,)
+        )
+        get_conn().commit()
+    return token
+
+
+def rotate_calendar_token() -> str:
+    import secrets as pysecrets
+
+    token = pysecrets.token_urlsafe(24)
+    get_conn().execute(
+        "UPDATE settings SET calendar_token = ? WHERE id = 1", (token,)
+    )
+    get_conn().commit()
+    return token
+
+
 def update_settings(**kwargs: Any) -> None:
     allowed = {
         "owner_name",

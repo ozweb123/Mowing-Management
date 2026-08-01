@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { CalendarSyncPanel } from "@/components/CalendarSyncPanel";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api, ClientApiError } from "@/lib/client-api";
 import {
@@ -127,6 +128,8 @@ export default function MorePage() {
           Full forecast list →
         </Link>
       </div>
+
+      <CalendarSyncPanel />
 
       <section className="panel mb-4">
         <h2 className="font-display text-lg font-bold text-jd-green-deep">
