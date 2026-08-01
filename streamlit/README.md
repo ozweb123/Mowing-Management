@@ -68,9 +68,9 @@ icloud_app_password = "xxxx-xxxx-xxxx-xxxx"
 ```
 
 Leave **Auto-sync to iCloud when schedule changes** ON (default).  
-Whenever Miles marks Done, pins a Week day, rain-pushes, or edits lawns, the app marks the calendar dirty and pushes to iCloud on the next page load (debounced ~45s). Creates/updates the **Miles Mowing** iCloud calendar.
+Whenever Miles marks Done, pins a Week day, rain-pushes, or edits lawns, the app pushes to iCloud **by itself** in the background (~10s after the last change). Creates/updates the **Miles Mowing** iCloud calendar. No Sync button required.
 
-Manual **Sync now** is still available if you want an immediate push.
+A manual **Sync now** (under Settings → Manual sync) remains as a fallback.
 
 ## What to send Miles
 

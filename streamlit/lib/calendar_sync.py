@@ -4,13 +4,15 @@ Push / update Miles' schedule into an iCloud calendar via CalDAV.
 Requires an Apple ID + app-specific password (not the normal login password):
 https://appleid.apple.com → Sign-In and Security → App-Specific Passwords
 
-Auto-sync: schedule mutations mark the calendar dirty; the next page load
-(or an immediate attempt) pushes to iCloud when secrets are configured.
+Auto-sync: schedule mutations mark the calendar dirty and schedule a
+background push (~10s debounce). Page loads also drain any leftover dirty
+state as a backup.
 """
 
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -22,8 +24,14 @@ log = logging.getLogger("miles.calendar")
 
 TZ = ZoneInfo("America/Chicago")
 CAL_NAME = "Miles Mowing"
-# Don't hammer iCloud if Miles taps Done on five yards in a row.
-DEBOUNCE_SEC = 45
+# Coalesce rapid taps (Done on several yards) into one CalDAV push.
+BG_DEBOUNCE_SEC = 10
+# Page-load backup: don't re-hit iCloud if we just synced.
+PAGE_DEBOUNCE_SEC = 20
+
+_timer_lock = threading.Lock()
+_sync_lock = threading.Lock()
+_pending_timer: threading.Timer | None = None
 
 
 def _secrets() -> tuple[str | None, str | None]:
@@ -99,6 +107,57 @@ def mark_calendar_dirty() -> None:
         "UPDATE settings SET calendar_dirty = 1 WHERE id = 1"
     )
     get_conn().commit()
+    schedule_background_sync()
+
+
+def background_sync_pending() -> bool:
+    """True while a debounced background sync timer is still waiting."""
+    with _timer_lock:
+        return _pending_timer is not None and _pending_timer.is_alive()
+
+
+def schedule_background_sync() -> None:
+    """
+    After a short quiet period, push to iCloud in a daemon thread.
+    Safe to call repeatedly — timers coalesce.
+    """
+    state = get_calendar_sync_state()
+    if not state["configured"] or not state["auto_sync"] or not state["dirty"]:
+        return
+
+    # Capture secrets on the Streamlit/request thread (not inside the worker).
+    email, password = _secrets()
+    if not email or not password:
+        return
+
+    global _pending_timer
+    with _timer_lock:
+        if _pending_timer is not None:
+            try:
+                _pending_timer.cancel()
+            except Exception:
+                pass
+        timer = threading.Timer(
+            BG_DEBOUNCE_SEC,
+            _background_sync_worker,
+            args=(email, password),
+        )
+        timer.daemon = True
+        _pending_timer = timer
+        timer.start()
+    log.info("Scheduled iCloud calendar sync in %ss", BG_DEBOUNCE_SEC)
+
+
+def _background_sync_worker(email: str, password: str) -> None:
+    try:
+        state = get_calendar_sync_state()
+        if not state["auto_sync"] or not state["dirty"]:
+            return
+        sync_schedule_to_icloud(10, email=email, password=password)
+        log.info("Background iCloud calendar sync completed")
+    except Exception as e:
+        log.exception("Background calendar sync failed")
+        _set_sync_result(False, str(e)[:500])
 
 
 def _set_sync_result(ok: bool, error: str | None = None) -> None:
@@ -120,7 +179,12 @@ def _set_sync_result(ok: bool, error: str | None = None) -> None:
     get_conn().commit()
 
 
-def sync_schedule_to_icloud(days_count: int = 10) -> dict[str, Any]:
+def sync_schedule_to_icloud(
+    days_count: int = 10,
+    *,
+    email: str | None = None,
+    password: str | None = None,
+) -> dict[str, Any]:
     """
     Upsert this week's (and upcoming) mow jobs into iCloud calendar "Miles Mowing".
     Returns counts: created, updated, deleted, total.
@@ -132,11 +196,21 @@ def sync_schedule_to_icloud(days_count: int = 10) -> dict[str, Any]:
             "caldav package missing. Add caldav to requirements and redeploy."
         ) from e
 
-    email, password = _secrets()
+    if not email or not password:
+        email, password = _secrets()
     if not email or not password:
         raise RuntimeError(
             "Add icloud_apple_id and icloud_app_password to Streamlit secrets."
         )
+
+    with _sync_lock:
+        return _sync_schedule_locked(days_count, email, password)
+
+
+def _sync_schedule_locked(
+    days_count: int, email: str, password: str
+) -> dict[str, Any]:
+    from caldav import DAVClient
 
     events = build_calendar_events(days_count)
     wanted_uids = {e["uid"] for e in events}
@@ -236,7 +310,7 @@ def maybe_auto_sync(
             last = datetime.fromisoformat(state["last_sync_at"])
             if last.tzinfo is None:
                 last = last.replace(tzinfo=TZ)
-            if datetime.now(tz=TZ) - last < timedelta(seconds=DEBOUNCE_SEC):
+            if datetime.now(tz=TZ) - last < timedelta(seconds=PAGE_DEBOUNCE_SEC):
                 return None
         except Exception:
             pass
