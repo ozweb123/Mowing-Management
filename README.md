@@ -7,6 +7,8 @@ Track yards (recurring or adhoc), mark jobs done with one big button, forecast t
 ## Features
 
 - **Today route** — due yards, Navigate (Apple Maps), On my way SMS, huge **Done** / **Done + Paid**
+- **Capacity bar** — scheduled hours vs free window after school/sports blocks
+- **Week planner** — 7-day dry-window plan; pin yards; accept suggested moves off wet days
 - **Lawns** — add / edit / remove; size, price, dog warning, gate code, notes, route order
 - **Weather-smart forecast** — spring ~6 days, early summer ~7, late dry summer 10–12; mud / severe delays
 - **10-day weather** — rain chance & inches for Night (8pm–8am), Morning (8am–1pm), Afternoon (1pm–8pm); sun & wind for AM/PM

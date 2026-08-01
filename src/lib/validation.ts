@@ -81,12 +81,24 @@ export const expenseCreateSchema = z.object({
   spentAt: z.string().datetime().optional(),
 });
 
+const blockedSlotSchema = z.object({
+  dow: z.coerce.number().int().min(0).max(6),
+  startHour: z.coerce.number().int().min(0).max(23),
+  endHour: z.coerce.number().int().min(1).max(24),
+  label: safeText(60).default("Blocked"),
+});
+
 export const settingsUpdateSchema = z.object({
   ownerName: safeText(60).optional(),
   savingsGoalDollars: z.coerce.number().min(0).max(1000000).optional(),
   savingsLabel: safeText(60).optional(),
   gasEstimatePerYardDollars: z.coerce.number().min(0).max(100).optional(),
   newPin: pinSchema.optional(),
+  /** Workday window for capacity math (local hours). */
+  availableStartHour: z.coerce.number().int().min(5).max(12).optional(),
+  availableEndHour: z.coerce.number().int().min(12).max(22).optional(),
+  /** School/sports blocks — subtracted from available minutes. */
+  blocked: z.array(blockedSlotSchema).max(21).optional(),
 });
 
 export const rainPushSchema = z.object({

@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
+import { CapacityBar } from "@/components/CapacityBar";
 import { WeatherStrip } from "@/components/WeatherStrip";
 import { JobCard } from "@/components/JobCard";
 import { ErrorBanner } from "@/components/ErrorBanner";
@@ -19,6 +21,14 @@ type TodayPayload = {
     estimatedCents: number;
     estimatedMinutes: number;
     gasEstimateCents: number;
+  };
+  capacity: {
+    scheduledMinutes: number;
+    availableMinutes: number;
+    overbooked: boolean;
+    fillPercent: number;
+    workWindowLabel: string;
+    blockedLabels: string[];
   };
   rainPushUntil: string | null;
 };
@@ -123,8 +133,6 @@ export default function TodayPage() {
           {data ? dollars(data.summary.estimatedCents) : "$—"} est.
         </p>
         <p className="text-sm text-jd-soil/75">
-          ~{data ? Math.round((data.summary.estimatedMinutes || 0) / 60 * 10) / 10 : "—"} hrs
-          {" · "}
           Gas ~{data ? dollars(data.summary.gasEstimateCents) : "$—"}
           {" · "}
           Season:{" "}
@@ -133,6 +141,17 @@ export default function TodayPage() {
           </span>
         </p>
       </section>
+
+      {data?.capacity ? (
+        <CapacityBar
+          scheduledMinutes={data.capacity.scheduledMinutes}
+          availableMinutes={data.capacity.availableMinutes}
+          overbooked={data.capacity.overbooked}
+          fillPercent={data.capacity.fillPercent}
+          workWindowLabel={data.capacity.workWindowLabel}
+          blockedLabels={data.capacity.blockedLabels}
+        />
+      ) : null}
 
       <div className="mt-3 flex gap-2">
         <button
@@ -143,13 +162,16 @@ export default function TodayPage() {
         >
           {pushing ? "Pushing…" : "Rain day — push all 1 day"}
         </button>
+        <Link href="/week" className="btn-secondary flex-1 text-center text-sm">
+          Week plan
+        </Link>
         {data?.rainPushUntil ? (
           <button
             type="button"
             className="btn-secondary text-sm"
             onClick={() => void clearPush()}
           >
-            Clear push
+            Clear
           </button>
         ) : null}
       </div>

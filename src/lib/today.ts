@@ -2,6 +2,7 @@
  * Assembles the "Today" dashboard Miles opens at 7am.
  */
 
+import { capacitySnapshot } from "./capacity";
 import { forecastLawn, estimateMinutes, getSeason } from "./forecast";
 import { listLawns } from "./lawns";
 import { lastMowedAt } from "./mowings";
@@ -100,6 +101,17 @@ export async function buildTodayView() {
       ["due", "overdue", "due_soon"].includes(j.forecast.dueStatus)
     ).length * settings.gas_estimate_per_yard_cents;
 
+  // Minutes that actually need doing today (not the "preview" filler yards)
+  const scheduledMinutes = displayJobs
+    .filter(
+      (j) =>
+        ["due", "overdue", "due_soon"].includes(j.forecast.dueStatus) ||
+        (j.lawn.scheduleType === "adhoc" && !j.forecast.lastMowedAt)
+    )
+    .reduce((s, j) => s + j.estimatedMinutes, 0);
+
+  const capacity = capacitySnapshot(scheduledMinutes);
+
   return {
     ownerName: settings.owner_name,
     season: getSeason(),
@@ -116,6 +128,7 @@ export async function buildTodayView() {
       estimatedMinutes: estMinutes,
       gasEstimateCents: gasCents,
     },
+    capacity,
     rainPushUntil: settings.rain_push_until,
   };
 }

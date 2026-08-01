@@ -1,6 +1,10 @@
 import { requireAuth, updatePin } from "@/lib/auth";
 import { assertRateLimit, clientKey, jsonErr, jsonOk, readJson } from "@/lib/api";
 import { getDb } from "@/lib/db";
+import {
+  getCapacitySettings,
+  saveCapacitySettings,
+} from "@/lib/capacity";
 import { settingsUpdateSchema } from "@/lib/validation";
 
 /** GET /api/settings */
@@ -22,6 +26,7 @@ export async function GET() {
       base_lon: number;
       timezone: string;
     };
+    const capacity = getCapacitySettings();
     return jsonOk({
       ownerName: row.owner_name,
       savingsGoalCents: row.savings_goal_cents,
@@ -30,6 +35,9 @@ export async function GET() {
       baseLat: row.base_lat,
       baseLon: row.base_lon,
       timezone: row.timezone,
+      availableStartHour: capacity.availableStartHour,
+      availableEndHour: capacity.availableEndHour,
+      blocked: capacity.blocked,
     });
   } catch (err) {
     return jsonErr(err);
@@ -67,6 +75,18 @@ export async function PATCH(req: Request) {
     }
     if (parsed.newPin) {
       updatePin(parsed.newPin);
+    }
+
+    if (
+      parsed.availableStartHour != null ||
+      parsed.availableEndHour != null ||
+      parsed.blocked != null
+    ) {
+      saveCapacitySettings({
+        availableStartHour: parsed.availableStartHour,
+        availableEndHour: parsed.availableEndHour,
+        blocked: parsed.blocked,
+      });
     }
 
     return jsonOk({ updated: true });

@@ -95,6 +95,15 @@ export function createMowing(input: MowingCreateInput): MowingRecord {
     now
   );
 
+  // Clear any week-planner pin once the yard is actually done.
+  try {
+    db.prepare(
+      `UPDATE lawns SET planned_mow_date = NULL, updated_at = ? WHERE id = ?`
+    ).run(now, input.lawnId);
+  } catch {
+    // Column may not exist yet on ancient DBs — week.ts migrates it.
+  }
+
   return getMowing(id);
 }
 
