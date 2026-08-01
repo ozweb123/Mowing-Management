@@ -21,6 +21,7 @@ type LawnRow = {
   route_order: number;
   dog_warning: DogWarning;
   gate_code: string;
+  phone: string;
   active: number;
   created_at: string;
   updated_at: string;
@@ -40,6 +41,7 @@ export function rowToLawn(r: LawnRow): Lawn {
     routeOrder: r.route_order,
     dogWarning: r.dog_warning,
     gateCode: r.gate_code,
+    phone: r.phone ?? "",
     active: !!r.active,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -78,8 +80,8 @@ export function createLawn(input: LawnCreateInput): Lawn {
   db.prepare(
     `INSERT INTO lawns (
       id, name, address, city, notes, charge_cents, size, schedule_type,
-      interval_days, route_order, dog_warning, gate_code, active, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      interval_days, route_order, dog_warning, gate_code, phone, active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.name,
@@ -93,6 +95,7 @@ export function createLawn(input: LawnCreateInput): Lawn {
     input.routeOrder,
     input.dogWarning,
     input.gateCode,
+    input.phone,
     input.active ? 1 : 0,
     now,
     now
@@ -126,13 +129,14 @@ export function updateLawn(
   const routeOrder = input.routeOrder ?? existing.routeOrder;
   const dogWarning = input.dogWarning ?? existing.dogWarning;
   const gateCode = input.gateCode ?? existing.gateCode;
+  const phone = input.phone ?? existing.phone;
   const active = input.active ?? existing.active;
 
   db.prepare(
     `UPDATE lawns SET
       name = ?, address = ?, city = ?, notes = ?, charge_cents = ?,
       size = ?, schedule_type = ?, interval_days = ?, route_order = ?,
-      dog_warning = ?, gate_code = ?, active = ?, updated_at = ?
+      dog_warning = ?, gate_code = ?, phone = ?, active = ?, updated_at = ?
      WHERE id = ?`
   ).run(
     name,
@@ -146,6 +150,7 @@ export function updateLawn(
     routeOrder,
     dogWarning,
     gateCode,
+    phone,
     active ? 1 : 0,
     now,
     id

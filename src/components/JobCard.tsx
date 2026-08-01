@@ -46,7 +46,8 @@ export function JobCard({
 
   const nav = mapsUrl(lawn.address, lawn.city);
   const textMsg = smsUrl(
-    `Hey! This is Miles — on my way to mow ${lawn.address || "your yard"} shortly.`
+    `Hey! This is Miles — on my way to mow ${lawn.address || "your yard"} shortly.`,
+    lawn.phone
   );
 
   return (
@@ -94,8 +95,14 @@ export function JobCard({
         <a href={nav} className="btn-secondary flex-1 text-center text-sm">
           Navigate
         </a>
-        <a href={textMsg} className="btn-secondary flex-1 text-center text-sm">
-          On my way
+        <a
+          href={textMsg}
+          className={`btn-secondary flex-1 text-center text-sm ${
+            lawn.phone ? "" : "opacity-70"
+          }`}
+          title={lawn.phone ? `Text ${lawn.phone}` : "Add a phone on the lawn for direct SMS"}
+        >
+          {lawn.phone ? "On my way" : "On my way (no #)"}
         </a>
       </div>
 

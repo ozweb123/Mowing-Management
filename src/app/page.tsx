@@ -83,6 +83,40 @@ export default function TodayPage() {
 
       <WeatherStrip day={data?.weatherToday} />
 
+      {/* One-line morning callout Miles asked for — storms vs rain-day */}
+      {(() => {
+        const day = data?.weatherToday;
+        if (!day) return null;
+        const afternoon = day.periods.find((p) => p.label === "afternoon");
+        const morning = day.periods.find((p) => p.label === "morning");
+        const storm = Math.max(
+          afternoon?.precipProbability ?? 0,
+          morning?.precipProbability ?? 0
+        );
+        if (day.severeFlag) {
+          return (
+            <p className="mt-3 rounded-xl bg-jd-danger px-3 py-3 text-sm font-bold text-white animate-rise">
+              Severe weather risk — hold the mower today.
+            </p>
+          );
+        }
+        if (storm >= 60) {
+          return (
+            <p className="mt-3 rounded-xl bg-jd-warn/20 px-3 py-3 text-sm font-bold text-jd-warn animate-rise">
+              Storms ~{storm}% this afternoon — start early, or use Rain day push.
+            </p>
+          );
+        }
+        if ((morning?.precipInches ?? 0) >= 0.4) {
+          return (
+            <p className="mt-3 rounded-xl bg-sky-800/15 px-3 py-3 text-sm font-bold text-sky-900 animate-rise">
+              Wet morning — yards may be muddy. Rain day push if you need it.
+            </p>
+          );
+        }
+        return null;
+      })()}
+
       <section className="panel mt-3 animate-rise-delay-1 border-l-4 border-l-jd-green">
         <p className="font-display text-2xl font-bold text-jd-green-deep">
           {data?.summary.yardCount ?? "—"} yards ·{" "}

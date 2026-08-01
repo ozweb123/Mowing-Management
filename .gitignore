@@ -40,3 +40,6 @@ next-env.d.ts
 
 # vitest
 .vitest
+
+mobile-test-screenshots/
+/opt/

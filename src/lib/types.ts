@@ -25,6 +25,8 @@ export interface Lawn {
   routeOrder: number;
   dogWarning: DogWarning;
   gateCode: string;
+  /** Customer phone for "On my way" SMS (digits / + allowed). */
+  phone: string;
   active: boolean;
   createdAt: string;
   updatedAt: string;

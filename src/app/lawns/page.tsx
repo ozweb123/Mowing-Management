@@ -17,6 +17,7 @@ const emptyForm = {
   scheduleType: "recurring",
   dogWarning: "none",
   gateCode: "",
+  phone: "",
   routeOrder: "100",
 };
 
@@ -70,6 +71,25 @@ export default function LawnsPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Delete failed.");
+    }
+  }
+
+  /** Move a lawn up/down in Miles' drive order. */
+  async function move(id: string, dir: -1 | 1) {
+    const active = lawns.filter((l) => l.active);
+    const idx = active.findIndex((l) => l.id === id);
+    const swap = idx + dir;
+    if (idx < 0 || swap < 0 || swap >= active.length) return;
+    const next = [...active];
+    [next[idx], next[swap]] = [next[swap], next[idx]];
+    try {
+      await api("/api/lawns/reorder", {
+        method: "POST",
+        body: JSON.stringify({ orderedIds: next.map((l) => l.id) }),
+      });
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Reorder failed.");
     }
   }
 
@@ -192,16 +212,32 @@ export default function LawnsPage() {
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </div>
-          <div>
-            <label className="label" htmlFor="gate">
-              Gate code
-            </label>
-            <input
-              id="gate"
-              className="input"
-              value={form.gateCode}
-              onChange={(e) => setForm({ ...form, gateCode: e.target.value })}
-            />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="label" htmlFor="gate">
+                Gate code
+              </label>
+              <input
+                id="gate"
+                className="input"
+                value={form.gateCode}
+                onChange={(e) => setForm({ ...form, gateCode: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="phone">
+                Phone (On my way)
+              </label>
+              <input
+                id="phone"
+                className="input"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="785-555-0100"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+            </div>
           </div>
           <button type="submit" className="btn-done w-full" disabled={busy}>
             {busy ? "Saving…" : "Save lawn"}
@@ -209,11 +245,14 @@ export default function LawnsPage() {
         </form>
       ) : null}
 
-      <ul className="mt-4 space-y-3">
+      <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-jd-green-dark/70">
+        Route order — use arrows to match how you drive
+      </p>
+      <ul className="mt-2 space-y-3">
         {lawns.map((lawn) => (
           <li key={lawn.id} className={`panel ${lawn.active ? "" : "opacity-60"}`}>
             <div className="flex items-start justify-between gap-2">
-              <div>
+              <div className="min-w-0 flex-1">
                 <Link
                   href={`/lawns/${lawn.id}`}
                   className="font-display text-xl font-bold text-jd-green-deep underline-offset-2 hover:underline"
@@ -223,16 +262,39 @@ export default function LawnsPage() {
                 <p className="text-sm text-jd-soil/75">
                   {lawn.address || "No address"} · {dollars(lawn.chargeCents)} ·{" "}
                   {lawn.scheduleType}
+                  {lawn.phone ? ` · ${lawn.phone}` : ""}
                   {!lawn.active ? " · inactive" : ""}
                 </p>
               </div>
-              <button
-                type="button"
-                className="text-sm font-bold text-jd-danger"
-                onClick={() => void remove(lawn.id)}
-              >
-                Remove
-              </button>
+              <div className="flex shrink-0 flex-col gap-1">
+                {lawn.active ? (
+                  <>
+                    <button
+                      type="button"
+                      className="min-h-[40px] min-w-[40px] rounded-lg bg-jd-green/10 text-lg font-bold text-jd-green-deep"
+                      aria-label="Move earlier in route"
+                      onClick={() => void move(lawn.id, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="min-h-[40px] min-w-[40px] rounded-lg bg-jd-green/10 text-lg font-bold text-jd-green-deep"
+                      aria-label="Move later in route"
+                      onClick={() => void move(lawn.id, 1)}
+                    >
+                      ↓
+                    </button>
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  className="text-sm font-bold text-jd-danger"
+                  onClick={() => void remove(lawn.id)}
+                >
+                  Remove
+                </button>
+              </div>
             </div>
             {lawn.notes ? (
               <p className="mt-2 text-sm text-jd-soil/85">{lawn.notes}</p>

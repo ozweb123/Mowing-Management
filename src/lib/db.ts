@@ -56,6 +56,7 @@ function migrate(db: Database.Database) {
       dog_warning TEXT NOT NULL DEFAULT 'none'
         CHECK (dog_warning IN ('none','friendly','caution','do_not_enter')),
       gate_code TEXT NOT NULL DEFAULT '',
+      phone TEXT NOT NULL DEFAULT '',
       active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -98,6 +99,14 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash);
   `);
 
+  // Lightweight column migrations for existing DBs.
+  const lawnCols = db.prepare(`PRAGMA table_info(lawns)`).all() as Array<{
+    name: string;
+  }>;
+  if (!lawnCols.some((c) => c.name === "phone")) {
+    db.exec(`ALTER TABLE lawns ADD COLUMN phone TEXT NOT NULL DEFAULT ''`);
+  }
+
   // Seed default settings + demo lawns on first run.
   const row = db.prepare("SELECT id FROM settings WHERE id = 1").get();
   if (!row) {
@@ -127,6 +136,7 @@ function seedDemoLawns(db: Database.Database) {
       order: 10,
       dog: "caution",
       gate: "",
+      phone: "785-555-0142",
       daysAgo: 6,
     },
     {
@@ -139,6 +149,7 @@ function seedDemoLawns(db: Database.Database) {
       order: 20,
       dog: "friendly",
       gate: "4521",
+      phone: "785-555-0198",
       daysAgo: 7,
     },
     {
@@ -151,6 +162,7 @@ function seedDemoLawns(db: Database.Database) {
       order: 30,
       dog: "none",
       gate: "",
+      phone: "785-555-0177",
       daysAgo: 5,
     },
     {
@@ -163,6 +175,7 @@ function seedDemoLawns(db: Database.Database) {
       order: 40,
       dog: "none",
       gate: "",
+      phone: "",
       daysAgo: null as number | null,
     },
   ];
@@ -170,8 +183,8 @@ function seedDemoLawns(db: Database.Database) {
   const insertLawn = db.prepare(`
     INSERT INTO lawns (
       id, name, address, city, notes, charge_cents, size, schedule_type,
-      interval_days, route_order, dog_warning, gate_code, active, created_at, updated_at
-    ) VALUES (?, ?, ?, 'Topeka, KS', ?, ?, ?, ?, NULL, ?, ?, ?, 1, ?, ?)
+      interval_days, route_order, dog_warning, gate_code, phone, active, created_at, updated_at
+    ) VALUES (?, ?, ?, 'Topeka, KS', ?, ?, ?, ?, NULL, ?, ?, ?, ?, 1, ?, ?)
   `);
 
   const insertMow = db.prepare(`
@@ -195,6 +208,7 @@ function seedDemoLawns(db: Database.Database) {
         l.order,
         l.dog,
         l.gate,
+        l.phone,
         now,
         now
       );

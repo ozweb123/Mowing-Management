@@ -54,9 +54,15 @@ export async function readJson<T = unknown>(req: Request): Promise<T> {
   }
 }
 
-/** Client IP best-effort for rate limiting (behind proxies). */
+/**
+ * Rate-limit bucket key. Intentionally ignores client-spoofable X-Forwarded-For
+ * unless TRUST_PROXY=1 (set only when behind a reverse proxy that strips/forwards XFF).
+ */
 export function clientKey(req: Request, suffix: string): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  const ip = fwd?.split(",")[0]?.trim() || "local";
-  return `${suffix}:${ip}`;
+  if (process.env.TRUST_PROXY === "1") {
+    const fwd = req.headers.get("x-forwarded-for");
+    const ip = fwd?.split(",")[0]?.trim();
+    if (ip) return `${suffix}:${ip}`;
+  }
+  return suffix;
 }

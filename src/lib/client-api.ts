@@ -56,6 +56,9 @@ export function mapsUrl(address: string, city: string): string {
   return `https://maps.apple.com/?q=${q}`;
 }
 
-export function smsUrl(message: string): string {
-  return `sms:&body=${encodeURIComponent(message)}`;
+/** Build an sms: link; include phone when we have one (iOS Safari friendly). */
+export function smsUrl(message: string, phone?: string): string {
+  const digits = (phone || "").replace(/[^\d+]/g, "");
+  const target = digits || "";
+  return `sms:${target}?&body=${encodeURIComponent(message)}`;
 }

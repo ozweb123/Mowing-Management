@@ -47,6 +47,13 @@ export const lawnCreateSchema = z.object({
   routeOrder: z.coerce.number().int().min(0).max(9999).default(100),
   dogWarning: dogWarningSchema.default("none"),
   gateCode: safeText(40).default(""),
+  /** US-ish phone: digits, spaces, dashes, parens, optional leading + */
+  phone: safeText(30)
+    .default("")
+    .refine(
+      (v) => v === "" || /^[+\d][\d\s().-]{6,28}$/.test(v),
+      "Phone looks invalid."
+    ),
   active: z.boolean().default(true),
 });
 

@@ -18,6 +18,7 @@ export default function LawnDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [charge, setCharge] = useState("");
   const [notes, setNotes] = useState("");
+  const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -26,6 +27,7 @@ export default function LawnDetailPage() {
       setLawn(l);
       setCharge(String(l.chargeCents / 100));
       setNotes(l.notes);
+      setPhone(l.phone || "");
       const mows = await api<MowingRecord[]>(
         `/api/mowings?lawnId=${id}&limit=20`
       );
@@ -55,6 +57,7 @@ export default function LawnDetailPage() {
         body: JSON.stringify({
           chargeDollars: Number(charge),
           notes,
+          phone,
         }),
       });
       await load();
@@ -122,6 +125,19 @@ export default function LawnDetailPage() {
             className="input"
             value={charge}
             onChange={(e) => setCharge(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor="phone">
+            Phone (On my way SMS)
+          </label>
+          <input
+            id="phone"
+            className="input"
+            inputMode="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="785-555-0100"
           />
         </div>
         <div>
