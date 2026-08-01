@@ -41,6 +41,10 @@ session_secret = "paste-a-long-random-string-here-at-least-32-chars"
 weather_lat = "39.0375"
 weather_lon = "-95.7250"
 weather_timezone = "America/Chicago"
+
+# Strongly recommended — see “Keep data across redeploys” below
+# turso_database_url = "libsql://…"
+# turso_auth_token = "eyJ…"
 ```
 
 5. Deploy → copy the `https://….streamlit.app` URL.
